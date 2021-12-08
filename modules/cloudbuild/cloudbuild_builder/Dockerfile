@@ -12,20 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/cloud-builders/gcloud-slim
+FROM gcr.io/cloud-builders/gcloud-slim AS build-env
 
 # Use ARG so that values can be overriden by user/cloudbuild
-ARG TERRAFORM_VERSION=0.13.6
-ARG TERRAFORM_VERSION_SHA256SUM=55f2db00b05675026be9c898bdd3e8230ff0c5c78dd12d743ca38032092abfc9
-ARG TERRAFORM_VALIDATOR_RELEASE=2021-03-22
+ARG TERRAFORM_VERSION=1.0.0
+ARG TERRAFORM_VERSION_SHA256SUM=8be33cc3be8089019d95eb8f546f35d41926e7c1e5deff15792e969dde573eb5
+ARG TERRAFORM_VALIDATOR_RELEASE=2021-06-11
 
 ENV ENV_TERRAFORM_VERSION=$TERRAFORM_VERSION
 ENV ENV_TERRAFORM_VERSION_SHA256SUM=$TERRAFORM_VERSION_SHA256SUM
 ENV ENV_TERRAFORM_VALIDATOR_RELEASE=$TERRAFORM_VALIDATOR_RELEASE
 
+COPY entrypoint.bash /builder/entrypoint.bash
+
 RUN apt-get update && \
    /builder/google-cloud-sdk/bin/gcloud -q components install alpha beta && \
-    apt-get -y install curl jq unzip git ca-certificates && \
+    apt-get -y install curl jq unzip git ca-certificates bash-static && \
     curl https://releases.hashicorp.com/terraform/${ENV_TERRAFORM_VERSION}/terraform_${ENV_TERRAFORM_VERSION}_linux_amd64.zip \
       > terraform_linux_amd64.zip && \
     echo "${ENV_TERRAFORM_VERSION_SHA256SUM} terraform_linux_amd64.zip" > terraform_SHA256SUMS && \
@@ -38,6 +40,9 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ENV PATH=/builder/terraform/:$PATH
-COPY entrypoint.bash /builder/entrypoint.bash
+FROM gcr.io/distroless/python3-debian11:debug
+WORKDIR /builder
+COPY --from=build-env /builder ./
+COPY --from=build-env /bin/bash-static /bin/bash
+ENV PATH=/bin:/builder/terraform:/builder/google-cloud-sdk/bin:$PATH
 ENTRYPOINT ["/builder/entrypoint.bash"]
