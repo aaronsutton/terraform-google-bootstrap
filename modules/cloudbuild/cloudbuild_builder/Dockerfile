@@ -43,8 +43,6 @@ RUN apt-get update && \
     make configure && \
     ./configure prefix=/git-static/ \
     --without-tcltk \
-    #--with-openssl \
-    #--with-curl \
     NO_GETTEXT=YesPlease \
     NO_SVN_TESTS=YesPlease \
     NO_REGEX=YesPlease \
