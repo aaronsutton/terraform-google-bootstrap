@@ -27,7 +27,7 @@ COPY entrypoint.bash /builder/entrypoint.bash
 
 RUN apt-get update && \
    /builder/google-cloud-sdk/bin/gcloud -q components install alpha beta && \
-    apt-get -y install curl jq unzip git ca-certificates bash-static autoconf build-essential gettext && \
+    apt-get -y install curl jq unzip git ca-certificates bash-static autoconf build-essential gettext libcurl4-openssl-dev && \
     curl https://releases.hashicorp.com/terraform/${ENV_TERRAFORM_VERSION}/terraform_${ENV_TERRAFORM_VERSION}_linux_amd64.zip \
       > terraform_linux_amd64.zip && \
     echo "${ENV_TERRAFORM_VERSION_SHA256SUM} terraform_linux_amd64.zip" > terraform_SHA256SUMS && \
@@ -41,7 +41,16 @@ RUN apt-get update && \
     mkdir /git-static && \
     cd git && \
     make configure && \
-    ./configure prefix=/git-static/ CFLAGS="${CFLAGS} -static" && \
+    ./configure prefix=/git-static/ \
+    --without-tcltk \
+    #--with-openssl \
+    #--with-curl \
+    NO_GETTEXT=YesPlease \
+    NO_SVN_TESTS=YesPlease \
+    NO_REGEX=YesPlease \
+    USE_LIBPCRE2=NoThanks \
+    NO_SYS_POLL_H=1 \
+    CFLAGS="${CFLAGS} `pkg-config -static –libs libcurl`" && \
     make && \
     make install && \
     apt-get --purge -y autoremove && \
@@ -52,6 +61,8 @@ FROM gcr.io/distroless/python3-debian11:debug
 WORKDIR /builder
 COPY --from=build-env /builder ./
 COPY --from=build-env /bin/bash-static /bin/bash
-COPY --from=build-env /git-static/git /bin/git
+COPY --from=build-env /git-static/bin/git /bin/git
+COPY --from=build-env /git-static /git-static
+COPY --from=build-env /usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
 ENV PATH=/bin:/builder/terraform:/builder/google-cloud-sdk/bin:/bin:$PATH
 ENTRYPOINT ["/builder/entrypoint.bash"]
